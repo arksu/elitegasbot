@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component
 import org.telegram.telegrambots.bots.TelegramWebhookBot
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
 import org.telegram.telegrambots.meta.api.objects.Update
 import su.ark.elitegasbot.entity.Log
 import su.ark.elitegasbot.repo.LogRepo
@@ -24,11 +25,11 @@ class EliteGasBot(
 
     val mapper = ObjectMapper();
 
-    val fd: DateTimeFormatter = DateTimeFormat.forPattern("d-MM-y")
-    val fdd: DateTimeFormatter = DateTimeFormat.forPattern("d_MM_y")
+    val formatDate: DateTimeFormatter = DateTimeFormat.forPattern("d-MM-y")
+    val formatDateData: DateTimeFormatter = DateTimeFormat.forPattern("d_MM_y")
 
-    val ft: DateTimeFormatter = DateTimeFormat.forPattern("HH:mm")
-    val ftd: DateTimeFormatter = DateTimeFormat.forPattern("HH_mm")
+    val formatTime: DateTimeFormatter = DateTimeFormat.forPattern("HH:mm")
+    val formatTimeData: DateTimeFormatter = DateTimeFormat.forPattern("HH_mm")
 
 
     @PostConstruct
@@ -57,9 +58,9 @@ class EliteGasBot(
         )
         logRepo.save(log)
 
-        val s = SendMessage()
         if (update.hasMessage()) {
             logger.debug("msg text: ${update.message.text}")
+            val s = SendMessage()
             s.chatId = update.message.chatId.toString()
             val text: String? = update.message.text
             if (!text.isNullOrEmpty()) {
@@ -81,55 +82,63 @@ class EliteGasBot(
             }
         } else if (update.hasCallbackQuery()) {
             val cb = update.callbackQuery
-            logger.debug("callbackQuery: ${cb.data}")
+            val data = cb.data
+            logger.debug("callbackQuery: $data")
+            val s = EditMessageText()
             s.chatId = cb.message.chatId.toString()
-            if (cb.data.equals("reserve_time", true)) {
-                s.text = "На какую дату вы хотите записаться?"
+            s.messageId = cb.message.messageId
 
+            when {
+                data.equals("reserve_time", true) -> {
+                    s.text = "На какую дату вы хотите записаться?"
 
-                val now = DateTime()
-                val d1 = now.plusDays(1)
-                val d2 = now.plusDays(2)
-                val d3 = now.plusDays(3)
-                val d4 = now.plusDays(4)
-                val d5 = now.plusDays(5)
+                    val days = 5
 
-                s.replyMarkup =
-                    KeyboardBuilder.start().newRow()
-                        .addButton(d1.toString(fd), "reserve_date_" + d1.toString(fdd)).newRow()
-                        .addButton(d2.toString(fd), "reserve_date_" + d2.toString(fdd)).newRow()
-                        .addButton(d3.toString(fd), "reserve_date_" + d3.toString(fdd)).newRow()
-                        .addButton(d4.toString(fd), "reserve_date_" + d4.toString(fdd)).newRow()
-                        .addButton(d5.toString(fd), "reserve_date_" + d5.toString(fdd)).newRow()
-                        .build()
-                return s
-            } else if (cb.data.startsWith("reserve_date_", true)) {
-                val st = cb.data.removePrefix("reserve_date_")
-                val sl = st.split("_")
+                    val keys = KeyboardBuilder.start().newRow()
 
+                    val now = DateTime()
+                    val dates = Array<DateTime>(days) {
+                        now.plusDays(it + 1)
+                    }
+                    dates.forEach {
+                        keys.addButton(it.toString(formatDate), "reserve_date_" + it.toString(formatDateData)).newRow()
+                    }
 
-                val t1 = DateTime(sl[2].toInt(), sl[1].toInt(), sl[0].toInt(), 10, 0)
-                val t2 = t1.plusHours(1)
-                val t3 = t2.plusHours(1)
-                val t4 = t3.plusHours(1)
-                val t5 = t4.plusHours(1)
-                val t6 = t5.plusHours(1)
+                    s.replyMarkup = keys.build()
+                    return s
+                }
+                data.startsWith("reserve_date_", true) -> {
+                    val st = data.removePrefix("reserve_date_")
+                    val sl = st.split("_")
 
-                s.text = t1.toString(fd) + " на какое время вы хотите записаться?"
-                s.replyMarkup =
-                    KeyboardBuilder.start().newRow()
-                        .addButton(t1.toString(ft), "reserve_time_" + t1.toString(ftd)).newRow()
-                        .addButton(t2.toString(ft), "reserve_time_" + t2.toString(ftd)).newRow()
-                        .addButton(t3.toString(ft), "reserve_time_" + t3.toString(ftd)).newRow()
-                        .addButton(t4.toString(ft), "reserve_time_" + t4.toString(ftd)).newRow()
-                        .addButton(t5.toString(ft), "reserve_time_" + t5.toString(ftd)).newRow()
-                        .addButton(t6.toString(ft), "reserve_time_" + t6.toString(ftd)).newRow()
-                        .build()
+                    // со скольки начинается время для записи
+                    val hourStart = 10
+                    // сколько всего часов (диапазон)
+                    val hours = 9
 
-                return s
-            } else if (cb.data.startsWith("reserve_time_", true)) {
-                s.text = "Запись оформлена! Ждем вас в назначенное время."
-                return s
+                    // дата начала
+                    val timeStart = DateTime(sl[2].toInt(), sl[1].toInt(), sl[0].toInt(), hourStart, 0)
+
+                    val times = Array<DateTime>(hours) {
+                        timeStart.plusHours(it)
+                    }
+
+                    s.text = timeStart.toString(formatDate) + " на какое время вы хотите записаться?"
+
+                    val keys = KeyboardBuilder.start().newRow()
+                    times.forEach {
+                        keys.addButton(it.toString(formatTime), "reserve_time_" + it.toString(formatTimeData)).newRow()
+
+                    }
+
+                    s.replyMarkup = keys.build()
+
+                    return s
+                }
+                data.startsWith("reserve_time_", true) -> {
+                    s.text = "Запись оформлена! Ждем вас в назначенное время."
+                    return s
+                }
             }
         }
         return null
