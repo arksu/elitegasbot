@@ -17,7 +17,6 @@ class ElitegasbotApplication {
     ): TelegramBotsApi {
         val webhook = DefaultWebhook()
         webhook.setInternalUrl("http://127.0.0.1:8090")
-//        webhook.
 
         val api = TelegramBotsApi(DefaultBotSession::class.java, webhook)
 

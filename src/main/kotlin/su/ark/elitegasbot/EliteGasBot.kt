@@ -74,6 +74,8 @@ class EliteGasBot(
                     s.replyMarkup =
                         KeyboardBuilder.start().newRow()
                             .addButton("Записаться", "reserve_time")
+                            .newRow()
+                            .addButton("Узнать стоимость установки ГБО", "request")
                             .build()
                 } else {
                     s.text = "Извините, я вас не понял"
@@ -89,6 +91,13 @@ class EliteGasBot(
             s.messageId = cb.message.messageId
 
             when {
+                data.equals("request", true) -> {
+//                    val m = SendContact(cb.message.chatId.toString(), "+73432532888", "ЭлитГаз")
+                    s.text =
+                        "Позвоните нам по телефону: [+7 (343) 253-28-88](tel:+73432532888), [+7 (963) 275-28-88](tel:+79632752888)"
+                    s.parseMode = "Markdown"
+                    return s
+                }
                 data.equals("reserve_time", true) -> {
                     s.text = "На какую дату вы хотите записаться?"
 
